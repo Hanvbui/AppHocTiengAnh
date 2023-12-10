@@ -1,0 +1,214 @@
+package org.example;
+
+import javafx.application.Application;
+import javafx.collections.FXCollections;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
+public class TranslationGUI extends Application {
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Translator");
+
+        TextArea inputTextArea = new TextArea();
+        TextArea translationTextArea = new TextArea();
+        translationTextArea.setPrefHeight(200);
+        ComboBox<Language> targetLanguageComboBox = new ComboBox<>();
+        targetLanguageComboBox.setItems(FXCollections.observableArrayList(Language.values()));
+        targetLanguageComboBox.setValue(Language.ENGLISH);
+
+        Button translateButton = new Button("Translate");
+
+        translateButton.setOnAction(event -> {
+            String apiKey = "4df257af6fmsh2d4c9cb4992e529p1fe6c0jsn1fe0fd12f06e";
+            String textToTranslate = inputTextArea.getText();
+            Language targetLanguage = targetLanguageComboBox.getValue();
+
+            try {
+                URIBuilder uriBuilder = new URIBuilder("https://google-translate1.p.rapidapi.com/language/translate/v2");
+                uriBuilder.setParameter("q", textToTranslate);
+                uriBuilder.setParameter("target", targetLanguage.getCode());
+
+                URI uri = uriBuilder.build();
+
+                CloseableHttpClient httpClient = HttpClients.createDefault();
+                HttpPost httpPost = new HttpPost(uri);
+                httpPost.setHeader("content-type", "application/x-www-form-urlencoded");
+                httpPost.setHeader("Accept-Encoding", "application/gzip");
+                httpPost.setHeader("X-RapidAPI-Key", apiKey);
+                httpPost.setHeader("X-RapidAPI-Host", "google-translate1.p.rapidapi.com");
+
+                String encodedText = URLEncoder.encode(textToTranslate, StandardCharsets.UTF_8.toString());
+                String encodedTargetLanguage = URLEncoder.encode(targetLanguage.getCode(), StandardCharsets.UTF_8.toString());
+
+                String content = "q=" + encodedText + "&target=" + encodedTargetLanguage;
+
+                StringEntity entity = new StringEntity(content);
+                httpPost.setEntity(entity);
+
+                HttpResponse response = httpClient.execute(httpPost);
+
+                String responseBody = EntityUtils.toString(response.getEntity());
+                translationTextArea.setText(responseBody);
+            } catch (IOException | URISyntaxException e) {
+                e.printStackTrace();
+            }
+        });
+
+        VBox vbox = new VBox(inputTextArea, targetLanguageComboBox, translateButton, new Label("Translation:"), translationTextArea);
+        vbox.setSpacing(10);
+
+        Scene scene = new Scene(vbox, 600, 600);
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    enum Language {
+        AFRIKAANS("Afrikaans", "af"),
+        ALBANIAN("Albanian", "sq"),
+        AMHARIC("Amharic", "am"),
+        ARABIC("Arabic", "ar"),
+        ARMENIAN("Armenian", "hy"),
+        AZERBAIJANI("Azerbaijani", "az"),
+        BASQUE("Basque", "eu"),
+        BELARUSIAN("Belarusian", "be"),
+        BENGALI("Bengali", "bn"),
+        BOSNIAN("Bosnian", "bs"),
+        BULGARIAN("Bulgarian", "bg"),
+        CATALAN("Catalan", "ca"),
+        CEBUANO("Cebuano", "ceb"),
+        CHINESE_SIMPLIFIED("Chinese (Simplified)", "zh-CN"),
+        CHINESE_TRADITIONAL("Chinese (Traditional)", "zh-TW"),
+        CORSICAN("Corsican", "co"),
+        CROATIAN("Croatian", "hr"),
+        CZECH("Czech", "cs"),
+        DANISH("Danish", "da"),
+        DUTCH("Dutch", "nl"),
+        ENGLISH("English", "en"),
+        ESPERANTO("Esperanto", "eo"),
+        ESTONIAN("Estonian", "et"),
+        FINNISH("Finnish", "fi"),
+        FRENCH("French", "fr"),
+        FRISIAN("Frisian", "fy"),
+        GALICIAN("Galician", "gl"),
+        GEORGIAN("Georgian", "ka"),
+        GERMAN("German", "de"),
+        GREEK("Greek", "el"),
+        GUJARATI("Gujarati", "gu"),
+        HAITIAN_CREOLE("Haitian Creole", "ht"),
+        HAUSA("Hausa", "ha"),
+        HAWAIIAN("Hawaiian", "haw"),
+        HEBREW("Hebrew", "he"),
+        HINDI("Hindi", "hi"),
+        HMONG("Hmong", "hmn"),
+        HUNGARIAN("Hungarian", "hu"),
+        ICELANDIC("Icelandic", "is"),
+        IGB("Igbo", "ig"),
+        INDONESIAN("Indonesian", "id"),
+        IRISH("Irish", "ga"),
+        ITALIAN("Italian", "it"),
+        JAPANESE("Japanese", "ja"),
+        JAVANESE("Javanese", "jw"),
+        KANNADA("Kannada", "kn"),
+        KAZAKH("Kazakh", "kk"),
+        KHMER("Khmer", "km"),
+        KOREAN("Korean", "ko"),
+        KURDISH("Kurdish", "ku"),
+        KYRGYZ("Kyrgyz", "ky"),
+        LAO("Lao", "lo"),
+        LATIN("Latin", "la"),
+        LATVIAN("Latvian", "lv"),
+        LITHUANIAN("Lithuanian", "lt"),
+        LUXEMBOURGISH("Luxembourgish", "lb"),
+        MACEDONIAN("Macedonian", "mk"),
+        MALAGASY("Malagasy", "mg"),
+        MALAY("Malay", "ms"),
+        MALAYALAM("Malayalam", "ml"),
+        MALTESE("Maltese", "mt"),
+        MAORI("Maori", "mi"),
+        MARATHI("Marathi", "mr"),
+        MONGOLIAN("Mongolian", "mn"),
+        MYANMAR("Myanmar (Burmese)", "my"),
+        NEPALI("Nepali", "ne"),
+        NORWEGIAN("Norwegian", "no"),
+        NYANJA("Nyanja (Chichewa)", "ny"),
+        PASHTO("Pashto", "ps"),
+        PERSIAN("Persian", "fa"),
+        POLISH("Polish", "pl"),
+        PORTUGUESE("Portuguese (Portugal, Brazil)", "pt"),
+        PUNJABI("Punjabi", "pa"),
+        ROMANIAN("Romanian", "ro"),
+        RUSSIAN("Russian", "ru"),
+        SAMOAN("Samoan", "sm"),
+        SCOTS_GAELIC("Scots Gaelic", "gd"),
+        SERBIAN("Serbian", "sr"),
+        SESOTHO("Sesotho", "st"),
+        SHONA("Shona", "sn"),
+        SINDHI("Sindhi", "sd"),
+        SINHALA("Sinhala (Sinhalese)", "si"),
+        SLOVAK("Slovak", "sk"),
+        SLOVENIAN("Slovenian", "sl"),
+        SOMALI("Somali", "so"),
+        SPANISH("Spanish", "es"),
+        SUNDANESE("Sundanese", "su"),
+        SWAHILI("Swahili", "sw"),
+        SWEDISH("Swedish", "sv"),
+        TAGALOG("Tagalog (Filipino)", "tl"),
+        TAJIK("Tajik", "tg"),
+        TAMIL("Tamil", "ta"),
+        TELUGU("Telugu", "te"),
+        THAI("Thai", "th"),
+        TURKISH("Turkish", "tr"),
+        UKRAINIAN("Ukrainian", "uk"),
+        URDU("Urdu", "ur"),
+        UZBEK("Uzbek", "uz"),
+        VIETNAMESE("Vietnamese", "vi"),
+        WELSH("Welsh", "cy"),
+        XHOSA("Xhosa", "xh"),
+        YIDDISH("Yiddish", "yi"),
+        YORUBA("Yoruba", "yo"),
+        ZULU("Zulu", "zu");
+
+        private final String name;
+        private final String code;
+
+        Language(String name, String code) {
+            this.name = name;
+            this.code = code;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+}
