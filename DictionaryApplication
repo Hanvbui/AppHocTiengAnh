@@ -1,0 +1,504 @@
+package org.example;
+
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebView;
+import javafx.stage.Stage;
+
+import java.sql.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+public class DictionaryApplication extends Application {
+
+    private ListView<String> wordList;
+    private TextArea explanationArea;
+    private TextField searchField;
+    private WebView webView;
+    private WebEngine webEngine;
+    private Button addButton, editButton, deleteButton, searchButton, translationButton;
+    private Word.Dictionary dictionary;
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Dictionary App");
+
+        // Initialize components
+        wordList = new ListView<>();
+        explanationArea = new TextArea();
+        searchField = new TextField();
+        searchButton = new Button("Search");
+        addButton = new Button("Add");
+        editButton = new Button("Edit");
+        deleteButton = new Button("Delete");
+        translationButton = new Button("Translate with TranslationGUI");
+        webView = new WebView();
+        webEngine = webView.getEngine();
+        dictionary = new Word.Dictionary();
+
+        SQLiteDataAppRetrieval.retrieveAppData(dictionary, wordList);
+
+        wordList.setPrefWidth(200);
+        explanationArea.setPrefWidth(200);
+        explanationArea.setPrefHeight(100);
+
+        HBox searchBox = new HBox(10, searchField, searchButton);
+        searchBox.setPadding(new Insets(5));
+
+        HBox buttonBox = new HBox(20, addButton, editButton, deleteButton);
+        buttonBox.setPadding(new Insets(5));
+
+        BorderPane root = new BorderPane();
+        root.setLeft(wordList);
+        root.setCenter(explanationArea);
+        root.setTop(searchBox);
+        root.setBottom(buttonBox);
+        root.setRight(webView);
+        addButton.setOnAction(event -> {
+            addWord();
+        });
+
+        editButton.setOnAction(event -> {
+            // Edit word logic
+            editWord();
+        });
+
+        deleteButton.setOnAction(event -> {
+            // Delete word logic
+            deleteWord();
+        });
+
+        searchButton.setOnAction(event -> {
+            // Search word logic
+            searchWord();
+        });
+
+        translationButton.setOnAction(event -> openTranslationGUI());
+        buttonBox.getChildren().add(translationButton);
+
+        wordList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                // Retrieve HTML content for the selected word
+                String htmlContent = retrieveHtmlContent(newValue);
+                // Display the explanation of the selected word in the explanationArea and WebView
+                displayExplanation(newValue, htmlContent);
+            }
+        });
+
+        // Tạo một TabPane
+        TabPane tabPane = new TabPane();
+
+        // Tab cho từ điển
+        Tab dictionaryTab = new Tab("Dictionary");
+        dictionaryTab.setContent(root);
+
+        // Tab cho trò chơi
+        Tab gameTab = new Tab("Game");
+        gameTab.setContent(createGameContent());
+
+        // Thêm các tab vào TabPane
+        tabPane.getTabs().addAll(dictionaryTab, gameTab);
+
+        root = new BorderPane();
+        root.setStyle("-fx-border-color: skyblue;");
+        // Hiển thị scene với TabPane
+        Scene scene = new Scene(tabPane, 400, 250);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+        scene.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+    }
+
+    private void editWord() {
+        String selectedWord = wordList.getSelectionModel().getSelectedItem();
+        if (selectedWord != null) {
+            TextInputDialog dialog = new TextInputDialog(selectedWord);
+            dialog.setTitle("Edit Word");
+            dialog.setHeaderText("Edit the selected word");
+            dialog.setContentText("Enter the new word:");
+
+            // Hiển thị dialog để người dùng nhập từ mới
+            dialog.showAndWait().ifPresent(newWord -> {
+                int selectedIndex = wordList.getSelectionModel().getSelectedIndex();
+                wordList.getItems().set(selectedIndex, newWord);
+                updateDictionary(selectedWord, newWord);
+            });
+        }
+    }
+
+    private void openTranslationGUI() {
+        TranslationGUI translationGUI = new TranslationGUI();
+        translationGUI.start(new Stage());
+    }
+    private void updateDictionary(String oldWord, String newWord) {
+        for (Word word : dictionary.words) {
+            if (word.word_target.equalsIgnoreCase(oldWord)) {
+                // Cập nhật từ mới vào từ điển
+                word.word_target = newWord;
+                // Hiển thị hộp thoại để người dùng nhập nghĩa mới
+                TextInputDialog explanationDialog = new TextInputDialog(word.word_explain);
+                explanationDialog.setTitle("Edit Explanation");
+                explanationDialog.setHeaderText("Edit the explanation for the selected word");
+                explanationDialog.setContentText("Enter the new explanation:");
+
+                // Hiển thị dialog để người dùng nhập nghĩa mới
+                explanationDialog.showAndWait().ifPresent(newExplanation -> {
+                    word.word_explain = newExplanation;
+                    System.out.println("Word edited successfully.");
+                });
+                return;
+            }
+        }
+        System.out.println("Word not found in the dictionary.");
+    }
+
+    private void addWord() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Add Word");
+        dialog.setHeaderText("Enter the new word");
+        dialog.setContentText("English word:");
+
+        // Hiển thị dialog để người dùng nhập từ mới
+        dialog.showAndWait().ifPresent(newWord -> {
+            String explanation = showExplanationDialog();
+            dictionary.insertWord(new Word(newWord, explanation));
+            wordList.getItems().add(newWord); // Cập nhật danh sách từ trong wordList
+            System.out.println("Word added to the dictionary.");
+        });
+    }
+
+    private String showExplanationDialog() {
+        TextInputDialog explanationDialog = new TextInputDialog();
+        explanationDialog.setTitle("Add Word");
+        explanationDialog.setHeaderText("Enter the Vietnamese meaning");
+        explanationDialog.setContentText("Vietnamese meaning:");
+
+        Optional<String> result = explanationDialog.showAndWait();
+        return result.orElse("");
+    }
+
+
+    private void deleteWord() {
+        String selectedWord = wordList.getSelectionModel().getSelectedItem();
+        if (selectedWord != null) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Delete Word");
+            alert.setHeaderText("Are you sure you want to delete the selected word?");
+            alert.setContentText("Word: " + selectedWord);
+
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                wordList.getItems().remove(selectedWord);
+                removeFromDictionary(selectedWord);
+            }
+        }
+    }
+
+    private void removeFromDictionary(String deletedWord) {
+        dictionary.words.removeIf(word -> word.word_target.equalsIgnoreCase(deletedWord));
+        System.out.println("Word deleted from the dictionary.");
+    }
+
+    private String retrieveHtmlContent(String selectedWord) {
+        String dbUrl = "jdbc:sqlite:C:\\Users\\pc\\Downloads\\dict_hh.db";
+        Connection connection = null;
+        String htmlContent = null;
+
+        try {
+            connection = DriverManager.getConnection(dbUrl);
+            Statement statement = connection.createStatement();
+
+            String query = "SELECT html FROM av WHERE word = ?";
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, selectedWord);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                htmlContent = resultSet.getString("html");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (connection != null) {
+                    connection.close();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        return htmlContent;
+    }
+
+    private void displayExplanation(String selectedWord, String htmlContent) {
+        System.out.println("Displaying explanation for: " + selectedWord);
+
+        for (Word word : dictionary.words) {
+            if (word.word_target.equalsIgnoreCase(selectedWord)) {
+                // Hiển thị thông tin từ các cột khác
+                String explanation = word.word_explain;
+                explanationArea.setText(explanation);
+
+                // Hiển thị nội dung HTML trong WebView
+                try {
+                    if (htmlContent != null) {
+                        webEngine.loadContent(htmlContent);
+                    } else {
+                        webView.getEngine().loadContent("");
+                    }
+                } catch (Exception e) {
+                    // Xử lý ngoại lệ khi load HTML
+                    e.printStackTrace();
+                    webView.getEngine().loadContent("");
+                }
+
+                return;
+            }
+        }
+        explanationArea.clear();
+        webView.getEngine().loadContent("");
+    }
+    private Node createGameContent() {
+        GameApplication gameApplication = new GameApplication();
+        return gameApplication.createGameContent();
+    }
+    private void searchWord() {
+        String lookupWord = searchField.getText().trim();
+
+        for (Word word : dictionary.words) {
+            if (word.word_target.equalsIgnoreCase(lookupWord)) {
+                explanationArea.setText("Meaning: " + word.word_explain);
+                return;
+            }
+        }
+
+        explanationArea.setText("Word not found in the dictionary.");
+    }
+
+    public static class GameApplication extends Application {
+
+        private Label questionLabel;
+        private Label feedbackLabel;
+        private ToggleGroup optionsToggleGroup;
+        private RadioButton optionARadioButton, optionBRadioButton, optionCRadioButton, optionDRadioButton;
+        private Button submitButton;
+        private int currentQuestionIndex;
+        private String[][] questionsAndAnswers;
+        private void shuffleQuestions() {
+            List<String[]> questionList = Arrays.asList(questionsAndAnswers);
+            Collections.shuffle(questionList);
+            questionsAndAnswers = questionList.toArray(new String[0][0]);
+        }
+
+        public static void main(String[] args) {
+            launch(args);
+        }
+
+        @Override
+        public void start(Stage primaryStage) {
+
+            // Hiển thị scene
+            Scene scene = new Scene(createGameContent(), 400, 250);
+            primaryStage.setScene(scene);
+            primaryStage.show();
+        }
+
+        // Phương thức tạo nội dung cho trò chơi
+        public Parent createGameContent() {
+            feedbackLabel = new Label();
+            feedbackLabel.setStyle("-fx-text-fill: green;");
+            questionLabel = new Label();
+            optionsToggleGroup = new ToggleGroup();
+            optionARadioButton = new RadioButton();
+            optionBRadioButton = new RadioButton();
+            optionCRadioButton = new RadioButton();
+            optionDRadioButton = new RadioButton();
+            submitButton = new Button("Submit");
+
+            // Đặt các nút radio vào một nhóm
+            optionARadioButton.setToggleGroup(optionsToggleGroup);
+            optionBRadioButton.setToggleGroup(optionsToggleGroup);
+            optionCRadioButton.setToggleGroup(optionsToggleGroup);
+            optionDRadioButton.setToggleGroup(optionsToggleGroup);
+
+            // Khởi tạo mảng câu hỏi và đáp án
+            questionsAndAnswers = new String[][]{
+                    {"What _ you doing?", "A. are\nB. do\nC. is\nD. have", "A"},
+                    {"_ is your weekend?", "A. when\nB. how\nC. what\nD. where", "B"},
+                    {"We use a _ to put the clothes in.", "A. wardrobe\nB. microwave\nC. sink\nD. cooker", "A"},
+                    {"My bedroom is small but it has a _ window.", "A. big\nB. small\nC. interesting\nD. old", "A"},
+                    {"We live in a town house, but our grandparents live in a/ an _ house.", "A. villa\nB. country\nC. apartment\nD. city", "B"},
+                    {"The room is messy. First, let’s put the book on the _ .", "A. ceiling  \nB. shelf\nC. floor \nD. wall", "B"},
+                    {"We are watching Tom and Jerry on _.", "A. cooker  \nB. bath  \nC. television\nD. table", "C"},
+                    {"There are many books and clothes on the floor. It’s really _.", "A. clean\nB. messy\nC. interesting\nD. tidy", "B"},
+                    {"Robot will help us do the housework such as cleaning the floor, _ meals and so on.", "A. cooking\nB. to cook\nC. go\nD. going", "A"},
+                    {"I left my bags in the _.", "A. furniture\nB. sofa\nC. fridge\nD. wardrobe", "D"},
+                    {"Find which word does not belong in each group.", "A. calculator \nB. pillow\nC. blanket \nD. bed", "A"},
+                    {"Find which word does not belong in each group.", "A. bedroom \nB. toilet  \nC. library\nD. kitchen", "C"},
+                    {"Find which word does not belong in each group.", "A. bed\nB. lamp\nC. fan\nD. villa", "D"},
+                    {"Find which word does not belong in each group.", "A. desk\nB. dishwasher\nC.  fridge\nD. sink", "A"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question", "A. suggest \nB.involve \nC. travel \nD. sustain", "C"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question",
+                            "A. natural\nB. safari\nC. interest\nD. benefit",
+                            "B"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question",
+                            "A. butterfly\nB. departure\nC. tradition\nD. protection",
+                            "A"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question",
+                            "A. environment\nB. ecology\nC. sustainable\nD. beneficial",
+                            "D"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question",
+                            "A. ecotourism\nB. relaxation\nC. preservation\nD. disappointed",
+                            "A"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question",
+                            "A. inorganic\nB. superstitious\nC. recognition\nD. sustainable",
+                            "D"},
+                    {"Mark the letter A, B, C, or to indicate the word that differs from the other three in the position of primary stress in each question",
+                            "A. ecology\nB. equality\nC. majority\nD. ceremony",
+                            "D"},
+
+                    // Thêm câu hỏi khác nếu cần
+            };
+
+            // Hiển thị câu hỏi đầu tiên
+            shuffleQuestions();
+            showQuestion(0);
+
+            // Layout cho trò chơi
+            BorderPane root = new BorderPane();
+            HBox optionsBox = new HBox(10, optionARadioButton, optionBRadioButton, optionCRadioButton, optionDRadioButton);
+            optionsBox.setPadding(new Insets(10));
+            VBox submitAndFeedbackBox = new VBox(10, submitButton, feedbackLabel);
+            root.setTop(questionLabel);
+            root.setCenter(optionsBox);
+            root.setBottom(submitAndFeedbackBox);
+
+
+            submitButton.setOnAction(event -> {
+                String selectedAnswer = getSelectedAnswer();
+                checkAnswer(selectedAnswer);
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questionsAndAnswers.length) {
+                    showQuestion(currentQuestionIndex);
+                } else {
+                    endGame();
+                }
+            });
+
+            return root;
+        }
+
+        private void showQuestion(int index) {
+            String[] questionAndAnswer = questionsAndAnswers[index];
+            String question = questionAndAnswer[0];
+            String options = questionAndAnswer[1];
+
+            questionLabel.setText(question);
+            optionARadioButton.setText(options.split("\n")[0]);
+            optionBRadioButton.setText(options.split("\n")[1]);
+            optionCRadioButton.setText(options.split("\n")[2]);
+            optionDRadioButton.setText(options.split("\n")[3]);
+        }
+
+        private String getSelectedAnswer() {
+            RadioButton selectedRadioButton = (RadioButton) optionsToggleGroup.getSelectedToggle();
+            return selectedRadioButton != null ? selectedRadioButton.getText().substring(0, 1) : "";
+        }
+
+        private void checkAnswer(String selectedAnswer) {
+            String correctAnswer = questionsAndAnswers[currentQuestionIndex][2];
+            boolean isCorrect = selectedAnswer.equalsIgnoreCase(correctAnswer);
+
+            if (isCorrect) {
+                feedbackLabel.setText("Correct! Well done!");
+            } else {
+                feedbackLabel.setText("Incorrect. The correct answer is " + correctAnswer);
+            }
+        }
+
+
+        private void endGame() {
+
+            ButtonType restartButtonType = new ButtonType("Restart", ButtonBar.ButtonData.OK_DONE);
+            ButtonType exitButtonType = new ButtonType("Exit", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Do you want to restart the game?",
+                    restartButtonType,
+                    exitButtonType);
+
+            alert.setTitle("Game Over");
+            alert.setHeaderText(null);
+
+            alert.showAndWait().ifPresent(response -> {
+                if (response == restartButtonType) {
+                    resetGame();
+                } else {
+                    System.exit(0);
+                }
+            });
+        }
+
+        private void resetGame() {
+            currentQuestionIndex = 0;
+            showQuestion(currentQuestionIndex);
+        }
+    }
+
+    public static class SQLiteDataAppRetrieval {
+        public static void retrieveAppData(Word.Dictionary myDictionary, ListView<String> wordList) {
+            String dbUrl = "jdbc:sqlite:C:\\Users\\pc\\Downloads\\dict_hh.db";
+            Connection connection = null;
+
+            try {
+                connection = DriverManager.getConnection(dbUrl);
+                Statement statement = connection.createStatement();
+
+                ResultSet resultSetAV = statement.executeQuery("SELECT * FROM av");
+                processResultSet(resultSetAV, myDictionary, wordList);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (connection != null) {
+                        connection.close();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        private static void processResultSet(ResultSet resultSet, Word.Dictionary dictionary, ListView<String> wordList) throws Exception {
+            while (resultSet.next()) {
+                String word_target = resultSet.getString("word");
+                String description = resultSet.getString("description");
+                String pronounce = resultSet.getString("pronounce");
+
+                String word_explain = description + " (Pronounce: " + pronounce + ")\n";
+
+                Word newWord = new Word(word_target, word_explain);
+                dictionary.insertWord(newWord);
+                wordList.getItems().add(word_target);
+            }
+
+            resultSet.close();
+        }
+    }
+}
