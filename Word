@@ -1,0 +1,295 @@
+package org.example;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Scanner;
+
+public class Word {
+    String word_target;
+    String word_explain;
+
+    public Word(String word_target, String word_explain) {
+        this.word_target = word_target;
+        this.word_explain = word_explain;
+    }
+
+    public static class Dictionary {
+        static ArrayList<Word> words;
+
+        public Dictionary() {
+            this.words = new ArrayList<>();
+        }
+
+        public static void insertWord(Word word) {
+            words.add(word);
+        }
+
+        public void sortDictionary() {
+            Collections.sort(words, (w1, w2) -> w1.word_target.compareToIgnoreCase(w2.word_target));
+        }
+
+        public void showAllWords() {
+            System.out.println(String.format("%-5s %-15s %-15s", "No", "English", "Vietnamese"));
+            for (int i = 0; i < words.size(); i++) {
+                Word word = words.get(i);
+                System.out.println(String.format("%-5d %-15s %-15s", i + 1, word.word_target, word.word_explain));
+            }
+        }
+
+        public static class DictionaryCommandLine extends Dictionary {
+            public static void dictionarySearcher(Dictionary dictionary) {
+                Scanner scanner = new Scanner(System.in);
+                System.out.print("Enter the search term: ");
+                String searchTerm = scanner.nextLine().trim().toLowerCase();
+
+                System.out.println("Matching words:");
+
+                for (Word word : dictionary.words) {
+                    String lowerCaseWord = word.word_target.toLowerCase();
+                    if (lowerCaseWord.startsWith(searchTerm)) {
+                        System.out.println(word.word_target);
+                    }
+                }
+            }
+
+            public static void playDictionaryGame(Dictionary dictionary) {
+                // Tạo một mảng chứa các câu hỏi và đáp án
+                String[][] questionsAndAnswers = {
+                        {"What _ you doing?", "A. are\nB. do\nC. is\nD. have", "B"},
+                        {"_ is your weekend?", "A. when\nB. how\nC. what\nD. where", "B"}
+                        // Thêm câu hỏi khác nếu cần
+                };
+
+                int correctAnswers = 0;
+
+                for (String[] questionAndAnswer : questionsAndAnswers) {
+                    String question = questionAndAnswer[0];
+                    String options = questionAndAnswer[1];
+                    String correctAnswer = questionAndAnswer[2];
+
+                    System.out.println(question);
+                    System.out.println(options);
+
+                    // Nhập lựa chọn từ người chơi
+                    Scanner scanner = new Scanner(System.in);
+                    System.out.print("Your choice [A/B/C/D]: ");
+                    String userChoice = scanner.nextLine().toUpperCase();
+
+                    // Kiểm tra đáp án
+                    boolean isCorrect = userChoice.equalsIgnoreCase(correctAnswer);
+
+                    if (isCorrect) {
+                        System.out.println("Correct! Well done!");
+                        correctAnswers++;
+                    } else {
+                        System.out.println("Incorrect. The correct answer is " + correctAnswer);
+                    }
+                }
+
+                System.out.println("Game Over! You got " + correctAnswers + " correct answers.");
+            }
+
+            public static void dictionaryAdvanced() {
+                Scanner scanner = new Scanner(System.in);
+                Dictionary myDictionary = new Dictionary();
+                DictionaryCommandLine.retrieveDataFromSQLite(myDictionary);
+
+                while (true) {
+                    System.out.println("Welcome to My Application!");
+                    System.out.println("[0] Exit");
+                    System.out.println("[1] Add");
+                    System.out.println("[2] Remove");
+                    System.out.println("[3] Update");
+                    System.out.println("[4] Display");
+                    System.out.println("[5] Lookup");
+                    System.out.println("[6] Search");
+                    System.out.println("[7] Game");
+                    System.out.println("[8] Import from sqlite");
+                    System.out.println("[9] Export to file");
+                    System.out.print("Your action: ");
+
+                    String input = scanner.nextLine();
+
+                    try {
+                        int action = Integer.parseInt(input);
+
+                        switch (action) {
+                            case 0:
+                                System.out.println("Exiting the application.");
+                                return;
+                            case 1:
+                                DictionaryManagement.addWord(myDictionary);
+                                break;
+                            case 2:
+                                DictionaryManagement.deleteWord(myDictionary);
+                                break;
+                            case 3:
+                                DictionaryManagement.editWord(myDictionary);
+                                break;
+                            case 4:
+                                myDictionary.sortDictionary();
+                                myDictionary.showAllWords();
+                                break;
+                            case 5:
+                                DictionaryManagement.dictionaryLookup(myDictionary);
+                                break;
+                            case 6:
+                                DictionaryCommandLine.dictionarySearcher(myDictionary);
+                                break;
+                            case 7:
+                                DictionaryCommandLine.playDictionaryGame(myDictionary);
+                                break;
+                            case 8:
+                                DictionaryCommandLine.retrieveDataFromSQLite(myDictionary);
+                                break;
+                            case 9:
+                                DictionaryManagement.dictionaryExportToFile(myDictionary, "exported_dictionary.txt");
+                                break;
+                            default:
+                                System.out.println("Action not supported.");
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Please enter a number.");
+                    }
+                }
+            }
+
+            public static void retrieveDataFromSQLite(Dictionary myDictionary) {
+                SQLiteDataRetrieval.retrieveData(myDictionary);
+            }
+
+
+            public static void dictionaryBasic() {
+                Dictionary myDictionary = new Dictionary();
+                SQLiteDataRetrieval.retrieveData(myDictionary);
+                DictionaryCommandLine.dictionaryAdvanced();
+            }
+
+
+        }
+
+        public static class DictionaryManagement extends Dictionary {
+            public static void insertFromCommandLine(Dictionary dictionary) {
+                Scanner scanner = new Scanner(System.in);
+                System.out.print("Enter the number of words: ");
+                int num_of_words = scanner.nextInt();
+                scanner.nextLine();
+
+                for (int i = 0; i < num_of_words; i++) {
+                    System.out.print("Enter the English word: ");
+                    String word_target = scanner.nextLine();
+                    System.out.print("Enter the Vietnamese meaning: ");
+                    String word_explain = scanner.nextLine();
+
+                    Word newWord = new Word(word_target, word_explain);
+                    dictionary.insertWord(newWord);
+                }
+                scanner.close();
+            }
+
+            public static void insertFromFile(Dictionary dictionary, String filePath) {
+                try {
+                    File file = new File(filePath);
+                    Scanner scanner = new Scanner(file);
+
+                    while (scanner.hasNextLine()) {
+                        String line = scanner.nextLine();
+                        String[] parts = line.split("\t"); // Tách từ và giải thích bằng dấu tab
+
+                        if (parts.length == 2) {
+                            String word_target = parts[0].trim();
+                            String word_explain = parts[1].trim();
+
+                            Word newWord = new Word(word_target, word_explain);
+                            dictionary.insertWord(newWord);
+                        } else {
+                            System.out.println("Invalid format in the file: " + line);
+                        }
+                    }
+
+                    scanner.close();
+                } catch (FileNotFoundException e) {
+                    System.out.println("File not found: " + filePath);
+                }
+            }
+
+            public static void dictionaryLookup(Dictionary dictionary) {
+                Scanner scanner = new Scanner(System.in);
+                System.out.print("Enter the word to look up: ");
+                String lookupWord = scanner.nextLine().trim();
+
+                for (Word word : dictionary.words) {
+                    if (word.word_target.equalsIgnoreCase(lookupWord)) {
+                        System.out.println("Meaning: " + word.word_explain);
+                        return;
+                    }
+                }
+
+                System.out.println("Word not found in the dictionary.");
+            }
+
+            public static void addWord(Dictionary dictionary) {
+                Scanner scanner = new Scanner(System.in);
+                System.out.print("Enter the English word: ");
+                String word_target = scanner.nextLine().trim();
+                System.out.print("Enter the Vietnamese meaning: ");
+                String word_explain = scanner.nextLine().trim();
+
+                Word newWord = new Word(word_target, word_explain);
+                dictionary.insertWord(newWord);
+
+                System.out.println("Word added to the dictionary.");
+            }
+
+            public static void editWord(Dictionary dictionary) {
+                Scanner scanner = new Scanner(System.in);
+                System.out.print("Enter the English word to edit: ");
+                String editWord = scanner.nextLine().trim();
+
+                for (Word word : dictionary.words) {
+                    if (word.word_target.equalsIgnoreCase(editWord)) {
+                        System.out.print("Enter the new Vietnamese meaning: ");
+                        String newExplanation = scanner.nextLine().trim();
+                        word.word_explain = newExplanation;
+                        System.out.println("Word edited successfully.");
+                        return;
+                    }
+                }
+
+                System.out.println("Word not found in the dictionary.");
+            }
+
+            public static void deleteWord(Dictionary dictionary) {
+                Scanner scanner = new Scanner(System.in);
+                System.out.print("Enter the English word to delete: ");
+                String deleteWord = scanner.nextLine().trim();
+
+                for (int i = 0; i < dictionary.words.size(); i++) {
+                    Word word = dictionary.words.get(i);
+                    if (word.word_target.equalsIgnoreCase(deleteWord)) {
+                        dictionary.words.remove(i);
+                        System.out.println("Word deleted from the dictionary.");
+                        return;
+                    }
+                }
+
+                System.out.println("Word not found in the dictionary.");
+            }
+
+            public static void dictionaryExportToFile(Dictionary dictionary, String filePath) {
+                try (FileWriter fileWriter = new FileWriter(filePath)) {
+                    for (Word word : dictionary.words) {
+                        fileWriter.write(word.word_target + "\t" + word.word_explain + "\n");
+                    }
+                    System.out.println("Dictionary exported to file: " + filePath);
+                } catch (IOException e) {
+                    System.out.println("Error exporting dictionary to file: " + e.getMessage());
+                }
+            }
+        }
+    }
+}
